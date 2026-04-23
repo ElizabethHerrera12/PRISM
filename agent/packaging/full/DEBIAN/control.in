@@ -1,0 +1,10 @@
+Package: prism-monitor
+Version: __VERSION__
+Section: admin
+Priority: optional
+Architecture: all
+Depends: bash, coreutils, grep, sed, nodejs (>= 18), mysql-server (>= 8.0), mysql-client | default-mysql-client, python3 (>= 3.10), python3-psutil, python3-mysql.connector
+Maintainer: PRISM Team
+Description: PRISM full stack monitoring platform
+ PRISM installs the Python collector, Node.js API, built React dashboard, systemd services,
+ and database initialization helper for Ubuntu deployments.

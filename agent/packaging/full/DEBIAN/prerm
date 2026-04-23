@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+systemctl stop prism-agent.service || true
+systemctl stop prism-web.service || true
+systemctl disable prism-agent.service || true
+systemctl disable prism-web.service || true

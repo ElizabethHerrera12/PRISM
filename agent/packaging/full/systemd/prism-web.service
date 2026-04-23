@@ -1,0 +1,18 @@
+[Unit]
+Description=PRISM API and dashboard service
+After=network.target prism-agent.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=prism
+Group=prism
+WorkingDirectory=/opt/prism-monitor/server
+EnvironmentFile=-/etc/prism-monitor/prism-web.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node src/app.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

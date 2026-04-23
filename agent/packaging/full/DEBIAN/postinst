@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+if ! id prism >/dev/null 2>&1; then
+    useradd --system --home /opt/prism-monitor --shell /usr/sbin/nologin prism
+fi
+
+mkdir -p /etc/prism-monitor
+
+if [ ! -f /etc/prism-monitor/prism-agent.env ]; then
+    cp /opt/prism-monitor/config/prism-agent.env.example /etc/prism-monitor/prism-agent.env
+fi
+
+if [ ! -f /etc/prism-monitor/prism-web.env ]; then
+    cp /opt/prism-monitor/config/prism-web.env.example /etc/prism-monitor/prism-web.env
+fi
+
+chown root:root /etc/prism-monitor/prism-agent.env /etc/prism-monitor/prism-web.env
+chmod 600 /etc/prism-monitor/prism-agent.env /etc/prism-monitor/prism-web.env
+
+systemctl daemon-reload
+systemctl enable prism-agent.service prism-web.service
+
+if grep -q 'change_me' /etc/prism-monitor/prism-agent.env /etc/prism-monitor/prism-web.env; then
+    echo 'PRISM installed. Edit /etc/prism-monitor/prism-agent.env and /etc/prism-monitor/prism-web.env, then run:'
+    echo '  sudo prism-init-db --env /etc/prism-monitor/prism-web.env'
+    echo '  sudo systemctl restart prism-agent prism-web'
+    exit 0
+fi
+
+if /usr/local/bin/prism-init-db --env /etc/prism-monitor/prism-web.env; then
+    systemctl restart prism-agent.service
+    systemctl restart prism-web.service
+else
+    echo 'PRISM installed, but automatic database initialization failed.'
+    echo 'Run: sudo prism-init-db --env /etc/prism-monitor/prism-web.env'
+fi

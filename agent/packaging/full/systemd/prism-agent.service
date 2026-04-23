@@ -1,0 +1,16 @@
+[Unit]
+Description=PRISM metric collection agent
+After=network.target mysql.service mariadb.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/prism-monitor/agent
+EnvironmentFile=-/etc/prism-monitor/prism-agent.env
+ExecStart=/usr/bin/python3 -m prism_agent.main
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

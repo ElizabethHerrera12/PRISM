@@ -1,0 +1,2 @@
+"""PRISM metric collector package."""
+

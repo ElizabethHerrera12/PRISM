@@ -1,0 +1,12 @@
+{
+  "name": "prism-monitor",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build:dashboard": "npm --prefix dashboard run build",
+    "build:deb:full": "bash scripts/build-full-deb.sh",
+    "dev:dashboard": "npm --prefix dashboard run dev",
+    "dev:server": "npm --prefix server run dev",
+    "start:server": "npm --prefix server run start"
+  }
+}
