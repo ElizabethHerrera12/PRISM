@@ -18,6 +18,20 @@ function getSortValue(process, field) {
   return String(process[field] ?? "").toLowerCase();
 }
 
+function filterProcesses(processes, searchTerm) {
+  if (!searchTerm) return processes;
+
+  const term = searchTerm.toLowerCase();
+
+  return processes.filter((process) => {
+    return (
+      String(process.pid ?? "").includes(term) ||
+      String(process.command_name ?? "").toLowerCase().includes(term) ||
+      String(process.user_name ?? "").toLowerCase().includes(term)
+    );
+  });
+}
+
 function sortProcesses(processes, field, direction) {
   const multiplier = direction === "asc" ? 1 : -1;
 
@@ -55,8 +69,10 @@ export default function ProcessTable({ compact = false, processes }) {
   const [sortField, setSortField] = useState(DEFAULT_SORT.field);
   const [sortDirection, setSortDirection] = useState(DEFAULT_SORT.direction);
   const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const sortedProcesses = sortProcesses(processes, sortField, sortDirection);
+  const filteredProcesses = filterProcesses(processes, searchTerm);
+  const sortedProcesses = sortProcesses(filteredProcesses, sortField, sortDirection);
   const totalPages = Math.max(1, Math.ceil(sortedProcesses.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -66,6 +82,10 @@ export default function ProcessTable({ compact = false, processes }) {
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
   }, [totalPages]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   function handleSort(field) {
     setPage(1);
@@ -113,6 +133,14 @@ export default function ProcessTable({ compact = false, processes }) {
   return (
     <div className="process-table-wrap">
       <div className="process-table__toolbar">
+        <div className="process-table__search">
+          <input
+            type="text"
+            placeholder="Search by PID, name, or user..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
         <p>
           Showing {pagedProcesses.length === 0 ? 0 : pageStart + 1}-{pageStart + pagedProcesses.length} of {sortedProcesses.length}
         </p>
