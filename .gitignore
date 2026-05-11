@@ -12,3 +12,6 @@ artifacts/
 build/
 tmp/
 
+docs/code-walkthrough-collector.md
+docs/code-walkthrough-frontend.md
+docs/code-walkthrough-server.md
