@@ -34,9 +34,6 @@ class MetricReader:
             cpu_mhz_min=round(cpu_freq.min, 2) if cpu_freq else None,
             cpu_mhz_max=round(cpu_freq.max, 2) if cpu_freq else None,
             memory_total_mb=int(memory.total / BYTES_PER_MB),
-            # The document schema only gives us MemTotal/MemFree. On Linux,
-            # "available" memory tracks what tools like htop/free report as
-            # usable memory much better than the raw "free" counter.
             memory_free_mb=int(memory.available / BYTES_PER_MB),
             memory_available_mb=int(memory.available / BYTES_PER_MB),
             memory_used_mb=int(memory.used / BYTES_PER_MB),
