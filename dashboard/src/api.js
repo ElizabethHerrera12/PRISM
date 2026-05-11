@@ -15,8 +15,30 @@ export function fetchLatestMetrics() {
   return getJson("/metrics/latest");
 }
 
-export function fetchHistory(range = "1h") {
-  return getJson(`/metrics/history?range=${encodeURIComponent(range)}`);
+export function fetchHistory(options = "1h") {
+  if (typeof options === "string") {
+    return getJson(`/metrics/history?range=${encodeURIComponent(options)}`);
+  }
+
+  const params = new URLSearchParams();
+
+  if (options.range) {
+    params.set("range", options.range);
+  }
+
+  if (options.start) {
+    params.set("start", options.start);
+  }
+
+  if (options.end) {
+    params.set("end", options.end);
+  }
+
+  if (options.bucket) {
+    params.set("bucket", options.bucket);
+  }
+
+  return getJson(`/metrics/history?${params.toString()}`);
 }
 
 export function fetchTopProcesses(limit = 50) {

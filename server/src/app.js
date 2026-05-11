@@ -41,9 +41,14 @@ app.get("/api/metrics/latest", async (_request, response) => {
 
 app.get("/api/metrics/history", async (request, response) => {
   try {
-    const range = request.query.range?.toString() ?? "1h";
-    const rows = await getHistory(range);
-    return response.json({ range, points: rows });
+    const payload = await getHistory({
+      range: request.query.range?.toString(),
+      start: request.query.start?.toString(),
+      end: request.query.end?.toString(),
+      bucket: request.query.bucket?.toString(),
+    });
+
+    return response.json(payload);
   } catch (error) {
     return response.status(400).json({ message: error.message });
   }
@@ -69,4 +74,3 @@ if (fs.existsSync(dashboardDist)) {
 app.listen(config.port, () => {
   console.log(`PRISM server listening on http://localhost:${config.port}`);
 });
-

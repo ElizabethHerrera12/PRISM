@@ -3,6 +3,8 @@ import os from "node:os";
 import { pool } from "../db.js";
 
 const HOST_NAME = process.env.PRISM_HOST_NAME ?? os.hostname();
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_BUCKETS = new Set(["raw", "hour", "day", "auto"]);
 
 function rangeToStartDate(range) {
   const value = range ?? "1h";
@@ -25,6 +27,149 @@ function rangeToStartDate(range) {
   }
 
   return now;
+}
+
+function parseDateInput(value, { endOfDay = false } = {}) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = DATE_ONLY_PATTERN.test(value)
+    ? `${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`
+    : value;
+
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date value: ${value}`);
+  }
+
+  return date;
+}
+
+function createHistoryWindow(options = {}) {
+  const range = options.range?.toString();
+  const startValue = options.start?.toString();
+  const endValue = options.end?.toString();
+
+  if (startValue || endValue) {
+    if (!startValue || !endValue) {
+      throw new Error("Both start and end must be provided together.");
+    }
+
+    const startDate = parseDateInput(startValue);
+    const endDate = parseDateInput(endValue, { endOfDay: true });
+
+    if (startDate > endDate) {
+      throw new Error("Start date must be before end date.");
+    }
+
+    return {
+      mode: "absolute",
+      startDate,
+      endDate,
+      start: startValue,
+      end: endValue,
+    };
+  }
+
+  const startDate = rangeToStartDate(range ?? "1h");
+
+  return {
+    mode: "relative",
+    startDate,
+    endDate: new Date(),
+    range: range ?? "1h",
+  };
+}
+
+function resolveBucket(window, bucket) {
+  const requestedBucket = bucket?.toString() ?? "auto";
+
+  if (!VALID_BUCKETS.has(requestedBucket)) {
+    throw new Error("Bucket must be one of auto, raw, hour, or day.");
+  }
+
+  if (requestedBucket !== "auto") {
+    return requestedBucket;
+  }
+
+  const durationMs = window.endDate.getTime() - window.startDate.getTime();
+  const durationHours = durationMs / (1000 * 60 * 60);
+
+  if (durationHours <= 48) {
+    return "raw";
+  }
+
+  if (durationHours <= 24 * 14) {
+    return "hour";
+  }
+
+  return "day";
+}
+
+function formatDateBoundary(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+  const seconds = `${date.getSeconds()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function buildHistoryPointQuery(bucket) {
+  if (bucket === "raw") {
+    return `
+      SELECT
+        cpu.\`dateTime\` AS sampled_at,
+        ROUND((cpu.\`cpuMHz\` / NULLIF(cpu.\`cpuMHzMax\`, 0)) * 100, 2) AS cpu_percent,
+        ROUND(((memory_info.\`MemTotal\` - memory_info.\`MemFree\`) / NULLIF(memory_info.\`MemTotal\`, 0)) * 100, 2) AS memory_used_percent,
+        disk_info.\`usePercent\` AS disk_used_percent
+      FROM cpu
+      INNER JOIN memory_info ON memory_info.\`dateTime\` = cpu.\`dateTime\`
+      INNER JOIN disk_info ON disk_info.\`dateTime\` = cpu.\`dateTime\`
+      WHERE cpu.\`dateTime\` BETWEEN ? AND ?
+      ORDER BY cpu.\`dateTime\` ASC
+    `;
+  }
+
+  const bucketFormat = bucket === "hour" ? "%Y-%m-%d %H:00:00" : "%Y-%m-%d 00:00:00";
+
+  return `
+    SELECT
+      DATE_FORMAT(cpu.\`dateTime\`, '${bucketFormat}') AS sampled_at,
+      ROUND(AVG((cpu.\`cpuMHz\` / NULLIF(cpu.\`cpuMHzMax\`, 0)) * 100), 2) AS cpu_percent,
+      ROUND(AVG(((memory_info.\`MemTotal\` - memory_info.\`MemFree\`) / NULLIF(memory_info.\`MemTotal\`, 0)) * 100), 2) AS memory_used_percent,
+      ROUND(AVG(disk_info.\`usePercent\`), 2) AS disk_used_percent
+    FROM cpu
+    INNER JOIN memory_info ON memory_info.\`dateTime\` = cpu.\`dateTime\`
+    INNER JOIN disk_info ON disk_info.\`dateTime\` = cpu.\`dateTime\`
+    WHERE cpu.\`dateTime\` BETWEEN ? AND ?
+    GROUP BY DATE_FORMAT(cpu.\`dateTime\`, '${bucketFormat}')
+    ORDER BY sampled_at ASC
+  `;
+}
+
+function buildSummaryPayload(row) {
+  return {
+    cpu_percent: {
+      average: Number(row?.cpu_average_percent ?? 0),
+      min: Number(row?.cpu_min_percent ?? 0),
+      max: Number(row?.cpu_max_percent ?? 0),
+    },
+    memory_used_percent: {
+      average: Number(row?.memory_average_percent ?? 0),
+      min: Number(row?.memory_min_percent ?? 0),
+      max: Number(row?.memory_max_percent ?? 0),
+    },
+    disk_used_percent: {
+      average: Number(row?.disk_average_percent ?? 0),
+      min: Number(row?.disk_min_percent ?? 0),
+      max: Number(row?.disk_max_percent ?? 0),
+    },
+  };
 }
 
 function buildSnapshotSelect(alias = "") {
@@ -114,29 +259,52 @@ export async function getLatestProcesses(limit = 10) {
 }
 
 export async function getHistory(range) {
-  const startDate = rangeToStartDate(range);
-  const [rows] = await pool.query(
+  const options = typeof range === "string" ? { range } : range ?? {};
+  const window = createHistoryWindow(options);
+  const bucket = resolveBucket(window, options.bucket);
+  const params = [formatDateBoundary(window.startDate), formatDateBoundary(window.endDate)];
+
+  const [rows] = await pool.query(buildHistoryPointQuery(bucket), params);
+  const [summaryRows] = await pool.query(
     `
       SELECT
-        cpu.\`dateTime\` AS sampled_at,
-        ROUND((cpu.\`cpuMHz\` / NULLIF(cpu.\`cpuMHzMax\`, 0)) * 100, 2) AS cpu_percent,
-        ROUND(((memory_info.\`MemTotal\` - memory_info.\`MemFree\`) / NULLIF(memory_info.\`MemTotal\`, 0)) * 100, 2) AS memory_used_percent,
-        disk_info.\`usePercent\` AS disk_used_percent
+        ROUND(AVG((cpu.\`cpuMHz\` / NULLIF(cpu.\`cpuMHzMax\`, 0)) * 100), 2) AS cpu_average_percent,
+        ROUND(MIN((cpu.\`cpuMHz\` / NULLIF(cpu.\`cpuMHzMax\`, 0)) * 100), 2) AS cpu_min_percent,
+        ROUND(MAX((cpu.\`cpuMHz\` / NULLIF(cpu.\`cpuMHzMax\`, 0)) * 100), 2) AS cpu_max_percent,
+        ROUND(AVG(((memory_info.\`MemTotal\` - memory_info.\`MemFree\`) / NULLIF(memory_info.\`MemTotal\`, 0)) * 100), 2) AS memory_average_percent,
+        ROUND(MIN(((memory_info.\`MemTotal\` - memory_info.\`MemFree\`) / NULLIF(memory_info.\`MemTotal\`, 0)) * 100), 2) AS memory_min_percent,
+        ROUND(MAX(((memory_info.\`MemTotal\` - memory_info.\`MemFree\`) / NULLIF(memory_info.\`MemTotal\`, 0)) * 100), 2) AS memory_max_percent,
+        ROUND(AVG(disk_info.\`usePercent\`), 2) AS disk_average_percent,
+        ROUND(MIN(disk_info.\`usePercent\`), 2) AS disk_min_percent,
+        ROUND(MAX(disk_info.\`usePercent\`), 2) AS disk_max_percent
       FROM cpu
       INNER JOIN memory_info ON memory_info.\`dateTime\` = cpu.\`dateTime\`
       INNER JOIN disk_info ON disk_info.\`dateTime\` = cpu.\`dateTime\`
-      WHERE cpu.\`dateTime\` >= ?
-      ORDER BY cpu.\`dateTime\` ASC
+      WHERE cpu.\`dateTime\` BETWEEN ? AND ?
     `,
-    [startDate],
+    params,
   );
 
-  return rows.map((row) => ({
-    sampled_at: row.sampled_at,
-    cpu_percent: Number(row.cpu_percent ?? 0),
-    memory_used_percent: Number(row.memory_used_percent ?? 0),
-    disk_used_percent: Number(row.disk_used_percent ?? 0),
-  }));
+  return {
+    bucket,
+    points: rows.map((row) => ({
+      sampled_at: row.sampled_at,
+      cpu_percent: Number(row.cpu_percent ?? 0),
+      memory_used_percent: Number(row.memory_used_percent ?? 0),
+      disk_used_percent: Number(row.disk_used_percent ?? 0),
+    })),
+    range: window.mode === "absolute"
+      ? {
+          mode: "absolute",
+          start: window.start,
+          end: window.end,
+        }
+      : {
+          mode: "relative",
+          value: window.range,
+        },
+    summary: buildSummaryPayload(summaryRows[0]),
+  };
 }
 
 export async function getLatestPayload() {

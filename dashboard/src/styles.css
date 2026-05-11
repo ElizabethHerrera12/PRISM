@@ -43,6 +43,7 @@ svg {
 
 button,
 select,
+input,
 a {
   font: inherit;
 }
@@ -95,11 +96,16 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   padding: 14px 16px;
+  border: 0;
   border-radius: 12px;
+  background: transparent;
   color: var(--muted);
   text-decoration: none;
+  text-align: left;
   font-weight: 500;
+  cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease;
 }
 
@@ -327,12 +333,14 @@ a {
   font-size: 0.92rem;
 }
 
-.data-panel__header select {
+.data-panel__header select,
+.history-filter-field input,
+.history-filter-field select {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #f9fafb;
-  color: var(--muted);
-  padding: 6px 10px;
+  color: #374151;
+  padding: 10px 12px;
 }
 
 .chart-shell {
@@ -341,17 +349,68 @@ a {
 
 .history-chart {
   width: 100%;
-  height: 192px;
+  min-height: 260px;
   background: #f9fafb;
   border: 1px solid #f3f4f6;
   border-radius: 12px;
 }
 
+.history-chart--empty {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+}
+
+.history-chart--empty p {
+  margin: 0;
+  text-align: center;
+}
+
+.history-chart__axis-label {
+  fill: #9ca3af;
+  font-size: 12px;
+  text-anchor: end;
+}
+
+.history-chart__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.history-chart__axis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.history-chart__axis span:nth-child(2) {
+  text-align: center;
+}
+
+.history-chart__axis span:last-child {
+  text-align: right;
+}
+
+.chart-empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: #f9fafb;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 .chart-legend {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
   gap: 24px;
-  margin-top: 12px;
   color: var(--muted);
   font-size: 0.78rem;
 }
@@ -375,6 +434,10 @@ a {
 
 .chart-legend__dot--blue {
   background: #3b82f6;
+}
+
+.chart-legend__dot--violet {
+  background: #8b5cf6;
 }
 
 .data-panel--top-processes {
@@ -424,10 +487,12 @@ a {
   margin-top: 16px;
   padding: 10px 12px;
   border-radius: 10px;
+  border: 0;
+  background: transparent;
   color: var(--blue);
-  text-decoration: none;
   font-size: 0.92rem;
   font-weight: 500;
+  cursor: pointer;
 }
 
 .top-processes__button:hover,
@@ -536,6 +601,191 @@ a {
   cursor: pointer;
 }
 
+.history-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.history-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.history-intro h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #1f2937;
+}
+
+.history-intro p {
+  margin: 10px 0 0;
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.history-intro p span {
+  color: #374151;
+  font-family: Consolas, Monaco, monospace;
+}
+
+.history-intro__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.history-intro__meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.history-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+  background: var(--panel-bg);
+  border: 1px solid #f3f4f6;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.history-filters__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-filter-chip {
+  min-width: 92px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.history-filter-chip--active {
+  background: var(--blue-soft);
+  border-color: #bfdbfe;
+  color: var(--blue);
+}
+
+.history-filters__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.history-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-filter-field span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.history-feedback {
+  margin: 0;
+  color: var(--muted);
+}
+
+.history-feedback--error {
+  color: var(--red);
+}
+
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.history-summary-card {
+  padding: 20px;
+  border: 1px solid #f3f4f6;
+  border-radius: 16px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+}
+
+.history-summary-card--red {
+  border-top: 3px solid #ef4444;
+}
+
+.history-summary-card--blue {
+  border-top: 3px solid #3b82f6;
+}
+
+.history-summary-card--violet {
+  border-top: 3px solid #8b5cf6;
+}
+
+.history-summary-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.history-summary-card__header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.history-summary-card__header span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.history-summary-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.history-summary-card__metrics dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.history-summary-card__metrics dd {
+  margin: 8px 0 0;
+  color: #1f2937;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.history-notes {
+  margin: 0;
+  padding-left: 18px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.history-notes li + li {
+  margin-top: 10px;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -553,6 +803,12 @@ a {
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .history-filters__fields,
+  .history-summary-grid {
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 }
 
@@ -575,7 +831,8 @@ a {
   .monitor-header,
   .process-table__toolbar,
   .monitor-header__meta,
-  .data-panel__header {
+  .data-panel__header,
+  .history-intro {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -596,5 +853,9 @@ a {
   .data-panel,
   .metric-card {
     padding: 18px;
+  }
+
+  .history-summary-card__metrics {
+    grid-template-columns: 1fr;
   }
 }

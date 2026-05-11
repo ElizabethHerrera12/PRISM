@@ -51,7 +51,7 @@ function SortHeader({ label, field, sortField, sortDirection, onSort }) {
   );
 }
 
-export default function ProcessTable({ compact = false, processes }) {
+export default function ProcessTable({ compact = false, processes, onViewAll = null }) {
   const [sortField, setSortField] = useState(DEFAULT_SORT.field);
   const [sortDirection, setSortDirection] = useState(DEFAULT_SORT.direction);
   const [page, setPage] = useState(1);
@@ -103,9 +103,9 @@ export default function ProcessTable({ compact = false, processes }) {
           )}
         </div>
 
-        <a href="#processes" className="top-processes__button">
+        <button type="button" className="top-processes__button" onClick={() => onViewAll?.()}>
           View All Processes
-        </a>
+        </button>
       </section>
     );
   }
